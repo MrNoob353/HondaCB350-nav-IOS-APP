@@ -1,0 +1,46 @@
+name: Build IOS IPA
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build iOS App
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+
+      - name: Install Project Dependencies
+        run: npm install
+
+      - name: Build iOS App (Unsigned)
+        run: |
+          npx expo prebuild --platform ios
+          cd ios
+          pod install
+          xcodebuild -workspace *.xcworkspace -scheme CB350Nav -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+
+      - name: Create IPA for Sideloading
+        run: |
+          mkdir -p Payload
+          mv ios/build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -qr app.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CB350Nav-ios-app
+          path: app.ipa
